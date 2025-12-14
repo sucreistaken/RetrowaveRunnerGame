@@ -1,0 +1,26 @@
+# Bağımlılıklar (Asla yükleme)
+node_modules
+package-lock.json 
+# (Not: package-lock.json bazen yüklenir ama senin durumunda hata veriyorsa ekleyebilirsin, 
+# ama standartta node_modules kesinlikle olmalı)
+
+# Build çıktıları
+dist
+build
+
+# Sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# Loglar
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editör dosyaları
+.vscode
+.idea
+
+# Çevresel değişkenler (Güvenlik için)
+.env
+.env.local
