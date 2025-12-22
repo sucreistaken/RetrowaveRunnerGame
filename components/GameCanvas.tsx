@@ -1,5 +1,7 @@
 // @ts-nocheck
 import React, { useRef, useEffect, useState, useMemo } from "react";
+// import Road from "./Road";
+import Landscape from "./Landscape";
 
 // Minimal, permissive JSX intrinsic elements to silence editor errors in this file
 // (avoids adding project-level declaration files)
@@ -46,6 +48,8 @@ interface GameCanvasProps {
   onScoreChange: (score: number) => void;
   onPhaseChange: (phase: GamePhase) => void;
   onBossInfo: (boss: Boss) => void;
+  orientation?: "auto" | "portrait" | "landscape";
+
 }
 
 // Global state ref to share between React components and R3F loop without context issues
@@ -56,6 +60,7 @@ const gameStateRef = {
     potentialScore: 1, // Start with 1 potential
     distance: 0,
     maxDistance: BOSS_DISTANCE,
+    sunZ: -BOSS_DISTANCE - 100,
     laneX: 0,
     input: { left: false, right: false },
     gates: [] as Gate[],
@@ -344,49 +349,356 @@ const BossMesh = () => {
   );
 };
 
-const RetrowaveFloor = () => {
-  const gridRef = useRef<THREE.GridHelper>(null);
+const RetroRoad = ({
+  width = 14,
+  length = 520,
+  dashCount = 34,
+}: {
+  width?: number;
+  length?: number;
+  dashCount?: number;
+}) => {
+  // Yol sabit dünyada; kamera/oyuncu ilerledikçe “akıyormuş” gibi görünür.
+  // Bu projede dünya z’si zaten ilerliyor (distance azalıyor), o yüzden road’u merkeze koymak yeterli.
+
+  const dashRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useEffect(() => {
+    if (!dashRef.current) return;
+
+    const startZ = -20;
+    const endZ = -length + 40;
+    const dz = (startZ - endZ) / dashCount;
+
+    for (let i = 0; i < dashCount; i++) {
+      const z = startZ - i * dz;
+      dummy.position.set(0, 0.115, z);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.updateMatrix();
+      dashRef.current.setMatrixAt(i, dummy.matrix);
+    }
+    dashRef.current.instanceMatrix.needsUpdate = true;
+  }, [dashCount, length, dummy]);
+
+  return (
+    <group>
+      {/* Asfalt */}
+      <mesh position={[0, 0.08, -length / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, length]} />
+        <meshStandardMaterial
+          color="#070711"
+          roughness={0.95}
+          metalness={0.05}
+          emissive="#000000"
+        />
+      </mesh>
+
+      {/* Neon kenar çizgileri */}
+      <mesh
+        position={[-width / 2 + 0.25, 0.11, -length / 2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[0.22, length]} />
+        <meshBasicMaterial color="#ff3bd4" toneMapped={false} />
+      </mesh>
+      <mesh
+        position={[+width / 2 - 0.25, 0.11, -length / 2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[0.22, length]} />
+        <meshBasicMaterial color="#ffb000" toneMapped={false} />
+      </mesh>
+
+      {/* Ortadaki kesik çizgi (instanced) */}
+      <instancedMesh
+        ref={dashRef}
+        args={[undefined as any, undefined as any, dashCount]}
+      >
+        <planeGeometry args={[0.22, 2.6]} />
+        <meshBasicMaterial color="#ffe17a" toneMapped={false} />
+      </instancedMesh>
+    </group>
+  );
+};
+
+const HorizonSun = () => {
+  const sunRef = useRef<THREE.Group>(null);
 
   useFrame(() => {
-    if (gridRef.current) {
-      // Create illusion of infinite movement by resetting Z
-      const playerZ = gameStateRef.current.distance;
-      gridRef.current.position.z = playerZ - (playerZ % 10);
-    }
+    if (!sunRef.current) return;
+
+    const gs = gameStateRef.current;
+
+    // Güneş dünya koordinatında SABİT: hep sunZ’de
+    sunRef.current.position.set(0, 16, gs.sunZ);
   });
 
   return (
-    <>
-      {/* Infinite Grid */}
-      <gridHelper
-        ref={gridRef}
-        args={[400, 40, 0xff00ff, 0x440044]}
-        position={[0, 0, 0]}
-      />
-
-      {/* Dark reflective plane below grid to catch reflections */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, -100]}>
-        <planeGeometry args={[1000, 1000]} />
-        <meshStandardMaterial color="#050110" roughness={0.1} metalness={0.8} />
+    <group ref={sunRef}>
+      <mesh>
+        <circleGeometry args={[40, 32]} />
+        <meshBasicMaterial
+          color="#ffaa00"
+          toneMapped={false}
+          fog={false}
+          
+        />
       </mesh>
 
-      {/* Sun on Horizon */}
-      <group position={[0, 15, -BOSS_DISTANCE - 100]}>
-        <mesh>
-          <circleGeometry args={[40, 32]} />
-          <meshBasicMaterial color="#ffaa00" toneMapped={false} />
+      {[...Array(6)].map((_, i) => (
+        <mesh key={i} position={[0, -10 + i * 4, 0.2]}>
+          <planeGeometry args={[80, 2]} />
+          <meshBasicMaterial
+            color="#1a0b2e"
+            toneMapped={false}
+            fog={false}
+            
+          />
         </mesh>
-        {/* Sun Stripes (simulated with bars) */}
-        {[...Array(6)].map((_, i) => (
-          <mesh key={i} position={[0, -10 + i * 4, 1]}>
-            <planeGeometry args={[80, 2]} />
-            <meshBasicMaterial color="#1a0b2e" />
-          </mesh>
-        ))}
-      </group>
-    </>
+      ))}
+    </group>
   );
 };
+
+
+
+// const WireframeValley = () => {
+//   const leftGeo = useMemo(() => {
+//     const g = new THREE.PlaneGeometry(520, 140, 90, 26);
+//     const pos = g.attributes.position as THREE.BufferAttribute;
+
+//     // "dağ" hissi: sadece Y'yi dalgalandır, alt kısım daha düz kalsın
+//     for (let i = 0; i < pos.count; i++) {
+//       const x = pos.getX(i);
+//       const y = pos.getY(i);
+
+//       // alt kısım (y < 0) daha sakin
+//       const strength = THREE.MathUtils.clamp((y + 70) / 140, 0, 1);
+
+//       const n =
+//         Math.sin(x * 0.06) * 8 +
+//         Math.sin((x + y) * 0.035) * 10 +
+//         Math.sin(y * 0.09) * 6;
+
+//       pos.setY(i, y + n * strength);
+//     }
+//     pos.needsUpdate = true;
+//     g.computeVertexNormals();
+//     return g;
+//   }, []);
+
+//   const rightGeo = useMemo(() => leftGeo.clone(), [leftGeo]);
+
+//   // Kamera dibini boş bırakmak için vadinin başlangıcını ileri alıyoruz
+//   const startZ = -320; // vadinin başladığı yer
+//   const wallX = TRACK_WIDTH / 2 + 18;
+
+//   return (
+//     <group>
+//       {/* SOL DAĞ */}
+//       <mesh
+//         geometry={leftGeo}
+//         position={[-wallX, 38, startZ]}
+//         rotation={[0, Math.PI / 2.25, 0]}
+//       >
+//         <meshStandardMaterial
+//           color="#05050f"
+//           emissive="#2b00ff"
+//           emissiveIntensity={1.0}
+//           wireframe
+//           toneMapped={false}
+//         />
+//       </mesh>
+
+//       {/* SAĞ DAĞ */}
+//       <mesh
+//         geometry={rightGeo}
+//         position={[+wallX, 38, startZ]}
+//         rotation={[0, -Math.PI / 2.25, 0]}
+//       >
+//         <meshStandardMaterial
+//           color="#05050f"
+//           emissive="#00c8ff"
+//           emissiveIntensity={0.95}
+//           wireframe
+//           toneMapped={false}
+//         />
+//       </mesh>
+//     </group>
+//   );
+// };
+
+const PalmAvenue = ({
+  perSide = 44,
+  spacing = 16,
+}: {
+  perSide?: number;
+  spacing?: number;
+}) => {
+  const trunkRef = useRef<THREE.InstancedMesh>(null);
+  const leafRef = useRef<THREE.InstancedMesh>(null);
+
+  const totalPalms = perSide * 2;
+  const leavesPerPalm = 7; // 6-9 arası güzel
+  const totalLeaves = totalPalms * leavesPerPalm;
+
+  const zRef = useRef<Float32Array>();
+  const jitterRef = useRef<Float32Array>();
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
+
+  useEffect(() => {
+    zRef.current = new Float32Array(perSide);
+    jitterRef.current = new Float32Array(perSide);
+    for (let i = 0; i < perSide; i++) {
+      zRef.current[i] = -30 - i * spacing;
+      jitterRef.current[i] = (Math.random() - 0.5) * 3.0;
+    }
+  }, [perSide, spacing]);
+
+  useFrame(({ clock }) => {
+    const gs = gameStateRef.current;
+    if (
+      !trunkRef.current ||
+      !leafRef.current ||
+      !zRef.current ||
+      !jitterRef.current
+    )
+      return;
+
+    const t = clock.getElapsedTime();
+    const recycleLen = perSide * spacing;
+    const playerZ = gs.distance;
+
+    for (let i = 0; i < perSide; i++) {
+      if (zRef.current[i] > playerZ + 30) zRef.current[i] -= recycleLen;
+    }
+
+    // --- TRUNKS ---
+    for (let i = 0; i < totalPalms; i++) {
+      const side = i < perSide ? -1 : 1;
+      const idx = i % perSide;
+
+      const xBase = side * (TRACK_WIDTH / 2 + 8.5);
+      const x = xBase + jitterRef.current[idx];
+      const z = zRef.current[idx];
+
+      // küçük “sway” (çok az)
+      const sway = Math.sin(t * 1.2 + idx * 0.7) * 0.06 * side;
+
+      dummy.position.set(x, 3.2, z);
+      dummy.rotation.set(0, side * 0.12, sway);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      trunkRef.current.setMatrixAt(i, dummy.matrix);
+    }
+    trunkRef.current.instanceMatrix.needsUpdate = true;
+
+    // --- LEAVES (billboard-ish planes) ---
+    let leafInstance = 0;
+    for (let i = 0; i < totalPalms; i++) {
+      const side = i < perSide ? -1 : 1;
+      const idx = i % perSide;
+
+      const xBase = side * (TRACK_WIDTH / 2 + 8.5);
+      const x = xBase + jitterRef.current[idx];
+      const z = zRef.current[idx];
+
+      const sway = Math.sin(t * 1.2 + idx * 0.7) * 0.12; // yaprak biraz daha hareketli
+      const topY = 7.2;
+
+      for (let k = 0; k < leavesPerPalm; k++) {
+        const ang = (k / leavesPerPalm) * Math.PI * 2;
+
+        // yapraklar yukarıdan dışa doğru açılsın
+        dummy.position.set(x, topY, z);
+        dummy.scale.set(1.0, 1.0, 1.0);
+
+        // yaprak yönü: Y etrafında dön + X ile aşağı doğru eğ
+        const rotY = ang + side * 0.15;
+        const rotX = -0.9 + Math.sin(ang) * 0.15; // genel eğim
+        const rotZ = sway * (0.6 + k * 0.05);
+
+        dummy.rotation.set(rotX, rotY, rotZ);
+        dummy.updateMatrix();
+
+        leafRef.current.setMatrixAt(leafInstance++, dummy.matrix);
+      }
+    }
+    leafRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <group>
+      {/* Trunk: daha palmiye gibi (taper) */}
+      <instancedMesh
+        ref={trunkRef}
+        args={[undefined as any, undefined as any, totalPalms]}
+      >
+        {/* topRadius, bottomRadius, height */}
+        <cylinderGeometry args={[0.22, 0.48, 6.8, 8]} />
+        <meshStandardMaterial
+          color="#12051b"
+          emissive="#ff00ff"
+          emissiveIntensity={0.18}
+          roughness={0.75}
+          metalness={0.05}
+          toneMapped={false}
+        />
+      </instancedMesh>
+
+      {/* Leaves: ince plane “fan” */}
+      <instancedMesh
+        ref={leafRef}
+        args={[undefined as any, undefined as any, totalLeaves]}
+      >
+        {/* width, height */}
+        <planeGeometry args={[4.8, 1.25]} />
+        <meshStandardMaterial
+          color="#001a14"
+          emissive="#00ffd0"
+          emissiveIntensity={1.15}
+          transparent
+          opacity={0.95}
+          side={THREE.DoubleSide}
+          roughness={0.25}
+          metalness={0.05}
+          toneMapped={false}
+        />
+      </instancedMesh>
+    </group>
+  );
+};
+
+const CameraController = ({ orientation = "auto" }: { orientation?: "auto" | "portrait" | "landscape" }) => {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    const aspect = size.width / size.height;
+
+    const mode =
+      orientation === "auto"
+        ? aspect > 1
+          ? "landscape"
+          : "portrait"
+        : orientation;
+
+    if (mode === "landscape") {
+      camera.fov = 70;
+      camera.position.set(0, 7.5, 18);
+    } else {
+      camera.fov = 60;
+      camera.position.set(0, 6, 14);
+    }
+
+    camera.updateProjectionMatrix();
+  }, [size, camera, orientation]);
+
+  return null;
+};
+
 
 const GameController = ({
   onScoreChange,
@@ -417,24 +729,16 @@ const GameController = ({
       );
       camera.lookAt(0, 2, gs.distance - 20); // Look slightly up towards horizon
 
-      if (gs.distance <= gs.boss.z + 10) {
+      if (gs.distance <= gs.sunZ + 35) {
         gs.phase = GamePhase.BOSS_FIGHT;
         onPhaseChange(GamePhase.BOSS_FIGHT);
 
         gs.boss.isActive = true;
+        gs.boss.z = gs.sunZ;
 
-        // --- FIXED BOSS HP LOGIC ---
-        // Calculate max HP based on the best possible run the player could have had.
-        // We take 90% of the potential score to leave a 10% margin for error/challenge.
         const calculatedMaxHp = Math.floor(gs.potentialScore * 0.9);
-
-        // Ensure boss has at least 50 HP so it's not instant win if potential is low
         gs.boss.maxHp = Math.max(50, calculatedMaxHp);
         gs.boss.currentHp = gs.boss.maxHp;
-
-        console.log(
-          `Boss HP Set: ${gs.boss.maxHp} (Potential Score: ${gs.potentialScore})`
-        );
 
         onBossInfo({ ...gs.boss });
       }
@@ -663,7 +967,17 @@ const GameScene: React.FC<GameCanvasProps> = ({
   onPhaseChange,
   onBossInfo,
 }) => {
+  const { gl } = useThree();
+useEffect(() => {
+  gl.localClippingEnabled = true;
+}, [gl]);
+
   const [gates, setGates] = useState<Gate[]>([]);
+
+  const gs = gameStateRef.current;
+
+  // RUNNING’de ak, diğer fazlarda dur
+  const scrollSpeed = gs.phase === GamePhase.RUNNING ? 1.0 : 0.0;
 
   useFrame(() => {
     // Keep gates that are not hit and within a reasonable distance behind the player
@@ -683,14 +997,18 @@ const GameScene: React.FC<GameCanvasProps> = ({
 
   return (
     <>
-      <color attach="background" args={["#170b29"]} />
-      <fog attach="fog" args={["#170b29", 60, 200]} />
+      <color attach="background" args={["#0b0618"]} />
+      <fog attach="fog" args={["#0b0618", 55, 230]} />
 
       {/* Retrowave Lighting - Boosted intensity */}
-      <ambientLight intensity={0.6} color="#4400ff" />
-      <pointLight position={[10, 20, 10]} intensity={2} color="#00ffff" />
-      <pointLight position={[-10, 5, -10]} intensity={2} color="#ff00ff" />
-      <directionalLight position={[0, 10, -5]} intensity={1} color="#ffaa00" />
+      <ambientLight intensity={0.55} color="#2b0b5a" />
+      <pointLight position={[12, 18, 8]} intensity={2.2} color="#00ffff" />
+      <pointLight position={[-12, 8, -12]} intensity={2.4} color="#ff00ff" />
+      <directionalLight
+        position={[0, 12, -6]}
+        intensity={0.9}
+        color="#ffb000"
+      />
 
       {/* Background Ambience */}
       <Stars
@@ -709,13 +1027,28 @@ const GameScene: React.FC<GameCanvasProps> = ({
         onBossInfo={onBossInfo}
       />
 
+      {/* <WireframeValley /> */}
+      <PalmAvenue perSide={42} spacing={17} />
+
       <Crowd />
-      <RetrowaveFloor />
+      
       <BossMesh />
 
       {gates.map((gate) => (
         <GateMesh key={gate.id} gate={gate} />
       ))}
+
+      {/* Landscape world-space sabit */}
+<Landscape speed={scrollSpeed} />
+<RetroRoad width={14} length={1400} dashCount={90} />
+
+
+{/* Road’u sadece shader ile akıtacağız */}
+<group scale={[3.5, 1, 3.0]} position={[0, 0, gameStateRef.current.distance - 12]}>
+  {/* <Road speed={scrollSpeed} /> */}
+</group>
+
+      <HorizonSun />
 
       <Sparkles
         count={50}
@@ -738,6 +1071,7 @@ const GameCanvas: React.FC<GameCanvasProps> = (props) => {
       potentialScore: 1,
       distance: 0,
       maxDistance: BOSS_DISTANCE,
+      sunZ: -BOSS_DISTANCE - 100,
       laneX: 0,
       input: { left: false, right: false },
       gates: [],
@@ -747,7 +1081,7 @@ const GameCanvas: React.FC<GameCanvasProps> = (props) => {
         taunt: "...",
         maxHp: 100,
         currentHp: 100,
-        z: -BOSS_DISTANCE,
+        z: -BOSS_DISTANCE - 100,
         isActive: false,
       },
       nextGateZ: -30,
@@ -762,13 +1096,20 @@ const GameCanvas: React.FC<GameCanvasProps> = (props) => {
       "PIXEL KING",
       "GLITCH MASTER",
     ];
-    const bossTaunts = ["Yolun Sonu!", "Sistem Hatası!", "Kaçış Yok!", "Game Over!"];
+    const bossTaunts = [
+      "Yolun Sonu!",
+      "Sistem Hatası!",
+      "Kaçış Yok!",
+      "Game Over!",
+    ];
 
     const randomName = bossNames[Math.floor(Math.random() * bossNames.length)];
-    const randomTaunt = bossTaunts[Math.floor(Math.random() * bossTaunts.length)];
+    const randomTaunt =
+      bossTaunts[Math.floor(Math.random() * bossTaunts.length)];
 
     gameStateRef.current.boss.name = randomName;
     gameStateRef.current.boss.taunt = randomTaunt;
+    gameStateRef.current.boss.z = gameStateRef.current.sunZ;
     props.onBossInfo({ ...gameStateRef.current.boss });
   };
 
@@ -777,13 +1118,17 @@ const GameCanvas: React.FC<GameCanvasProps> = (props) => {
     window.startGame = startGame;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "KeyA" || e.code === "ArrowLeft") gameStateRef.current.input.left = true;
-      if (e.code === "KeyD" || e.code === "ArrowRight") gameStateRef.current.input.right = true;
+      if (e.code === "KeyA" || e.code === "ArrowLeft")
+        gameStateRef.current.input.left = true;
+      if (e.code === "KeyD" || e.code === "ArrowRight")
+        gameStateRef.current.input.right = true;
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "KeyA" || e.code === "ArrowLeft") gameStateRef.current.input.left = false;
-      if (e.code === "KeyD" || e.code === "ArrowRight") gameStateRef.current.input.right = false;
+      if (e.code === "KeyA" || e.code === "ArrowLeft")
+        gameStateRef.current.input.left = false;
+      if (e.code === "KeyD" || e.code === "ArrowRight")
+        gameStateRef.current.input.right = false;
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -818,6 +1163,7 @@ const GameCanvas: React.FC<GameCanvasProps> = (props) => {
       }}
     >
       <Canvas shadows camera={{ position: [0, 6, 12], fov: 60 }}>
+        <CameraController orientation={props.orientation} />
         <GameScene {...props} />
       </Canvas>
     </div>

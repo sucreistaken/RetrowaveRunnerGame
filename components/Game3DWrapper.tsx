@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import GameCanvas from "./GameCanvas";
 import { GamePhase } from "../types";
-import { BOSS_DISTANCE } from "../constants";
 
 interface GameCanvasProps {
   onScoreChange: (score: number) => void;
@@ -12,10 +11,6 @@ interface GameCanvasProps {
 
 const Game3DWrapper: React.FC<GameCanvasProps> = (props) => {
   const startGame = () => {
-    // Reset the shared state from the GameCanvas module
-    // (GameCanvas manages its own gameStateRef internally)
-    // We'll call the exposed window.startGame hook that GameCanvas previously attached.
-    // If GameCanvas needs initialisation logic, it should read from global state.
     props.onPhaseChange(GamePhase.RUNNING);
     props.onScoreChange(1);
   };
@@ -23,36 +18,40 @@ const Game3DWrapper: React.FC<GameCanvasProps> = (props) => {
   useEffect(() => {
     // @ts-ignore
     window.startGame = startGame;
-
     return () => {
       // @ts-ignore
       delete window.startGame;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div
-      className="w-full h-full bg-[#170b29] outline-none cursor-crosshair"
+      className="w-screen h-screen bg-[#170b29] outline-none cursor-crosshair overflow-hidden"
       tabIndex={0}
       onTouchStart={(e) => {
         const touchX = e.touches[0].clientX;
         if (touchX < window.innerWidth / 2) {
-          // Simulate left input
-          const ev = new KeyboardEvent("keydown", { code: "ArrowLeft" });
-          window.dispatchEvent(ev);
+          window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
         } else {
-          const ev = new KeyboardEvent("keydown", { code: "ArrowRight" });
-          window.dispatchEvent(ev);
+          window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
         }
       }}
       onTouchEnd={() => {
-        const ev = new KeyboardEvent("keyup", { code: "ArrowLeft" });
-        window.dispatchEvent(ev);
-        const ev2 = new KeyboardEvent("keyup", { code: "ArrowRight" });
-        window.dispatchEvent(ev2);
+        window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+        window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
       }}
     >
-      <Canvas shadows camera={{ position: [0, 6, 12], fov: 60 }}>
+      <Canvas
+        shadows
+        style={{ width: "100%", height: "100%" }}
+        camera={{
+          fov: 70,
+          position: [0, 7.5, 18],
+          near: 0.1,
+          far: 2000,
+        }}
+      >
         <GameCanvas {...props} />
       </Canvas>
     </div>
