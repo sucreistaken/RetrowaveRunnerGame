@@ -1,21 +1,73 @@
-
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img width="1200" height="475" alt="Neon Horde banner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+# Neon Horde — Synthwave Run
+
+**3D endless runner with a synthwave/retrowave aesthetic. Recruit a horde, dodge gates, run down bosses.**
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## Gameplay
 
-View your app in AI Studio: https://ai.studio/apps/drive/1iQvLNFVdQGUSykn20jUrXyuFuhjHKzkc
+You run forward, your crowd grows or shrinks depending on which gate you pick:
 
-## Run Locally
+| Gate | Effect |
+|---|---|
+| Multiplier gate | Boost crowd size |
+| Subtractor gate | Burns runners |
+| Boss zone | Crowd vs. boss; size matters |
 
-**Prerequisites:**  Node.js
+Steer left/right between lanes, hit the right gates, survive the boss at the end of each segment, score climbs.
 
+**Controls** Touch (left/right swipe or tap) on mobile, Arrow keys / A-D on desktop.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Modes** Auto-orientation; manual portrait or landscape lock available from the menu.
+
+## Tech Stack
+
+| Layer | Stack |
+|---|---|
+| Renderer | Three.js (3D canvas) |
+| UI | React 18 + TypeScript, Tailwind for menus / HUD, Lucide icons |
+| Tooling | Vite |
+| AI integration | Built with Google AI Studio + Gemini (initial scaffold from AI Studio) |
+
+## Quick start
+
+Requirements: Node 18+, a Gemini API key (if you want to keep the AI Studio integration).
+
+```bash
+git clone https://github.com/sucreistaken/RetrowaveRunnerGame.git
+cd RetrowaveRunnerGame
+npm install
+
+# Set Gemini key in .env.local
+echo "GEMINI_API_KEY=your-key-here" > .env.local
+
+npm run dev
+# → http://localhost:5173
+```
+
+## Project structure
+
+```
+App.tsx               Game phase + UI shell (menu, in-game HUD, game-over)
+components/
+  GameCanvas.tsx      Three.js scene + game loop
+  Game3DWrapper.tsx   R3F/Three wrapper
+  Landscape.tsx       Synthwave horizon / grid background
+constants.ts          Tunables: track width, player speed, gate spacing, boss distance
+types.ts              GamePhase, Boss, shared types
+```
+
+## Roadmap
+
+- Power-ups (slow-mo, shield, double-multiplier)
+- Daily-seed run for leaderboard fairness
+- Web Audio synthwave score
+- Mobile-first install prompt (PWA wrapper)
+
+## Origin
+
+Started as an AI Studio scaffold ([open original](https://ai.studio/apps/drive/1iQvLNFVdQGUSykn20jUrXyuFuhjHKzkc)), then taken offline and grown into a proper game project.
